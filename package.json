@@ -1,0 +1,28 @@
+{
+  "name": "ulticp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "build:apk": "powershell -NoProfile -Command \"$env:JAVA_HOME='C:\\Program Files\\Java\\jdk-17'; $env:ANDROID_HOME=Join-Path $env:LOCALAPPDATA 'Android\\Sdk'; Set-Location android; & 'C:\\Users\\chris\\.gradle\\wrapper\\dists\\gradle-8.9-bin\\90cnw93cvbtalezasaz0blq0a\\gradle-8.9\\bin\\gradle.bat' assembleRelease; Copy-Item 'app\\build\\outputs\\apk\\release\\app-release.apk' '..\\UltiCP-android.apk' -Force\""
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.1.1",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}
+

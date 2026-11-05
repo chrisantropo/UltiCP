@@ -1,0 +1,25 @@
+[package]
+name = "ulticp-app"
+version.workspace = true
+edition.workspace = true
+description = "UltiCP - Portapapeles avanzado y gestor de snippets Local-First"
+
+[lib]
+name = "ulticp_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+ulticp-core = { path = "../crates/ulticp-core" }
+tauri = { version = "2.0", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+arboard = "3.4"
+image = { version = "0.25", default-features = false, features = ["png"] }
+base64 = "0.22"
+dirs = "5.0"
+chrono = "0.4"
+

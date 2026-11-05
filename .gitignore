@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Frontend build output
+dist/
+
+# Rust / Cargo build output
+target/
+**/target/
+
+# Android Gradle build & local SDK config
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# OS / IDE files
+.DS_Store
+Thumbs.db
+*.log
