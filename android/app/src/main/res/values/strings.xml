@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">UltiCP</string>
+    <string name="accessibility_service_description">Permite expandir abreviaturas de snippets (;firma, ;fecha, etc.) al escribir y limpiar enlaces de seguimiento en el portapapeles de forma 100% local.</string>
+</resources>
+
