@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permisos necesarios para leer y escribir los archivos .jsonl sincronizados por Syncthing en /storage/emulated/0/Documents/UltiCP -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
 
     <application
         android:allowBackup="true"
         android:label="UltiCP"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:requestLegacyExternalStorage="true"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
@@ -20,7 +27,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Integración nativa en el menú contextual de selección de texto de Android (sin requerir permisos sensibles) -->
+        <!-- Integración nativa en el menú contextual de selección de texto de Android -->
         <activity
             android:name=".ProcessTextActivity"
             android:label="UltiCP ⚡ Expandir / Limpiar"

@@ -579,13 +579,25 @@ fn spawn_clipboard_watcher(app_handle: AppHandle, db: Arc<Database>, last_hash: 
             }
         }
 
+        let mut sync_tick: u32 = 0;
+
         loop {
             std::thread::sleep(Duration::from_millis(400));
+            sync_tick = sync_tick.wrapping_add(1);
 
             let settings = match db.get_settings() {
                 Ok(s) => s,
                 Err(_) => continue,
             };
+
+            // Every ~3.2 seconds (8 ticks), check if Syncthing updated any remote device JSONL file
+            if settings.auto_sync_enabled && sync_tick % 8 == 0 {
+                if let Ok(report) = synchronize_with_folder(&db) {
+                    if report.imported_clips > 0 || report.imported_snippets > 0 {
+                        let _ = app_handle.emit("global-shortcut-triggered", "synced");
+                    }
+                }
+            }
 
             if settings.pause_monitoring {
                 continue;

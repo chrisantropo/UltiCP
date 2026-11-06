@@ -1,5 +1,6 @@
 use crate::db::Database;
 use crate::models::{SyncRecord, SyncReport};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use chrono::Utc;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -29,7 +30,7 @@ pub fn synchronize_with_folder(db: &Database) -> Result<SyncReport, String> {
     let mut imported_clips = 0;
     let mut imported_snippets = 0;
 
-    // 1. Read all remote device JSONL files (including any manually dropped .jsonl files)
+    // 1. Read all remote device JSONL files
     if let Ok(entries) = fs::read_dir(&devices_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -50,7 +51,6 @@ pub fn synchronize_with_folder(db: &Database) -> Result<SyncReport, String> {
                     if let Ok(record) = serde_json::from_str::<SyncRecord>(trimmed) {
                         match record {
                             SyncRecord::Clip { mut item, deleted } => {
-                                // Check if there is an image blob in blobs_dir
                                 if item.category == crate::models::ClipCategory::Image {
                                     let blob_path =
                                         blobs_dir.join(format!("{}.png", item.content_hash));
@@ -64,6 +64,14 @@ pub fn synchronize_with_folder(db: &Database) -> Result<SyncReport, String> {
                                         }
                                         item.image_path =
                                             Some(local_target.to_string_lossy().to_string());
+                                        if item.image_data_url.is_none() {
+                                            if let Ok(bytes) = fs::read(&local_target) {
+                                                item.image_data_url = Some(format!(
+                                                    "data:image/png;base64,{}",
+                                                    BASE64.encode(&bytes)
+                                                ));
+                                            }
+                                        }
                                     }
                                 }
                                 if db.merge_remote_clip(&item, deleted).unwrap_or(false) {
@@ -103,8 +111,13 @@ pub fn synchronize_with_folder(db: &Database) -> Result<SyncReport, String> {
                     }
                 }
             }
+            let mut lightweight_item = item.clone();
+            // Keep JSONL lightweight: image bytes live in `blobs/<sha256>.png`
+            lightweight_item.image_data_url = None;
+            lightweight_item.image_path = None;
+
             let rec = SyncRecord::Clip {
-                item: item.clone(),
+                item: lightweight_item,
                 deleted: *deleted,
             };
             if let Ok(line) = serde_json::to_string(&rec) {
@@ -136,4 +149,3 @@ pub fn synchronize_with_folder(db: &Database) -> Result<SyncReport, String> {
         timestamp: Utc::now().timestamp_millis(),
     })
 }
-

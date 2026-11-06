@@ -37,7 +37,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      gap: 8px;
     }
     .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .logo-box {
@@ -67,11 +67,15 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .hdr-btn {
+    .hdr-actions {
+      display: flex;
+      gap: 6px;
       flex-shrink: 0;
+    }
+    .hdr-btn {
       white-space: nowrap;
-      padding: 8px 12px;
-      font-size: 0.78rem;
+      padding: 8px 10px;
+      font-size: 0.76rem;
     }
     main.scroll-area {
       flex: 1;
@@ -79,6 +83,17 @@
       -webkit-overflow-scrolling: touch;
     }
     .container { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .perm-banner {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      border-radius: 12px;
+      padding: 12px;
+      margin: 12px 14px 0 14px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 0.8rem;
+    }
     .search-row { display: flex; gap: 8px; }
     input[type="text"], textarea {
       width: 100%; background: var(--surface); border: 1px solid var(--border);
@@ -133,6 +148,16 @@
     .nav-btn.active { color: #a5b4fc; background: rgba(95,102,238,0.12); }
     .check-row { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; }
     label.field { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; color: var(--muted); }
+    .status-box {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.76rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
   </style>
 </head>
 <body>
@@ -146,10 +171,22 @@
         <small id="hdr-device">Local-First · Syncthing P2P</small>
       </div>
     </div>
-    <button class="btn-primary hdr-btn" onclick="captureNow()">+ Capturar</button>
+    <div class="hdr-actions">
+      <button class="hdr-btn" onclick="syncNow()">🔄 Sync</button>
+      <button class="btn-primary hdr-btn" onclick="captureNow()">+ Capturar</button>
+    </div>
   </header>
 
   <main class="scroll-area">
+    <!-- STORAGE PERMISSION BANNER -->
+    <div id="perm-banner" class="perm-banner">
+      <strong style="color:#fcd34d;">⚠️ Permiso requerido para leer archivos de Syncthing</strong>
+      <span>En Android 11–15 debes activar «Acceso a todos los archivos» para que UltiCP pueda leer los clips que Syncthing trae desde Windows en <code>Documents/UltiCP</code>.</span>
+      <button class="btn-amber" onclick="UltiCPBridge.requestAllFilesPermission()">
+        🔓 Activar Permiso de Archivos ahora
+      </button>
+    </div>
+
     <!-- TAB 1: HISTORY -->
     <div id="tab-history" class="container">
       <div class="search-row">
@@ -221,6 +258,9 @@
         <p style="font-size:0.78rem;color:var(--muted);">
           Comparte esta carpeta en la app Syncthing de Android con tu PC Windows. Cada dispositivo escribe en su propio archivo <code>devices/&lt;id&gt;.jsonl</code> sin corromper SQLite.
         </p>
+
+        <div class="status-box" id="sync-status-box"></div>
+
         <label class="field">Nombre del dispositivo
           <input type="text" id="cfg-name" />
         </label>
@@ -238,6 +278,7 @@
         </label>
         <div class="btn-row">
           <button class="btn-primary" onclick="saveSettings()">Guardar y Sincronizar Ahora</button>
+          <button class="btn-amber" onclick="UltiCPBridge.requestAllFilesPermission()">Permiso Archivos</button>
         </div>
       </div>
     </div>
@@ -251,18 +292,28 @@
   </nav>
 
   <script>
-    let state = { clips: [], snippets: [] };
+    let state = { clips: [], snippets: [], detected_files: [] };
     let currentCat = 'all';
 
     function loadState(jsonStr) {
       try {
         state = JSON.parse(jsonStr);
-        document.getElementById('hdr-device').textContent = state.device_name + ' · Syncthing P2P';
+        document.getElementById('hdr-device').textContent = state.device_name + ' · ' + (state.clips ? state.clips.length : 0) + ' clips';
         document.getElementById('cfg-name').value = state.device_name || '';
         document.getElementById('cfg-id').value = state.device_id || '';
         document.getElementById('cfg-folder').value = state.sync_folder || '';
         document.getElementById('cfg-autoclean').checked = !!state.auto_clean_urls;
         document.getElementById('cfg-autoexpand').checked = !!state.snippet_expansion_enabled;
+
+        const permBanner = document.getElementById('perm-banner');
+        permBanner.style.display = state.storage_permission_granted ? 'none' : 'flex';
+
+        const files = state.detected_files || [];
+        document.getElementById('sync-status-box').innerHTML =
+          `<div><strong>Permiso de archivos:</strong> ${state.storage_permission_granted ? '✅ Concedido' : '⚠️ Falta conceder permiso'}</div>` +
+          `<div><strong>Archivos en devices/:</strong> ${files.length ? files.join(', ') : 'Ninguno detectado aún'}</div>` +
+          `<div><strong>Total fusionado:</strong> ${(state.clips || []).length} clips, ${(state.snippets || []).length} snippets</div>`;
+
         renderClips();
         renderSnippets();
       } catch (e) { console.error(e); }
@@ -274,6 +325,10 @@
 
     function captureNow() {
       if (window.UltiCPBridge) loadState(UltiCPBridge.captureClipboardNow());
+    }
+
+    function syncNow() {
+      if (window.UltiCPBridge) loadState(UltiCPBridge.syncNow());
     }
 
     function setCat(cat, btn) {
@@ -293,7 +348,7 @@
       const filtered = (state.clips || []).filter(c => {
         if (currentCat === 'pinned' && !c.is_pinned) return false;
         if (currentCat !== 'all' && currentCat !== 'pinned' && c.category !== currentCat) return false;
-        if (q && !c.content.toLowerCase().includes(q)) return false;
+        if (q && !c.content.toLowerCase().includes(q) && !(c.source_device || '').toLowerCase().includes(q)) return false;
         return true;
       });
 

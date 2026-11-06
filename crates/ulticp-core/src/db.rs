@@ -749,19 +749,54 @@ impl Database {
 
     pub fn merge_remote_clip(&self, item: &ClipboardItem, deleted: bool) -> Result<bool, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        let local_updated: Option<i64> = conn
+        let existing: Option<(String, i64, i64)> = conn
             .query_row(
-                "SELECT updated_at FROM clipboard_items WHERE id = ?1 OR content_hash = ?2 LIMIT 1",
+                "SELECT id, updated_at, deleted FROM clipboard_items WHERE id = ?1 OR content_hash = ?2 LIMIT 1",
                 params![item.id, item.content_hash],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .optional()
             .map_err(|e| e.to_string())?;
 
-        if let Some(local_ts) = local_updated {
-            if local_ts >= item.updated_at {
+        if let Some((existing_id, local_ts, local_deleted)) = existing {
+            if local_ts >= item.updated_at && (local_deleted != 0) == deleted {
                 return Ok(false);
             }
+            conn.execute(
+                "UPDATE clipboard_items SET
+                    category = ?1,
+                    content = ?2,
+                    preview = ?3,
+                    language = ?4,
+                    image_path = COALESCE(?5, image_path),
+                    image_data_url = COALESCE(?6, image_data_url),
+                    is_pinned = ?7,
+                    source_device = ?8,
+                    updated_at = ?9,
+                    copy_count = ?10,
+                    deleted = ?11
+                 WHERE id = ?12",
+                params![
+                    item.category.as_str(),
+                    item.content,
+                    item.preview,
+                    item.language,
+                    item.image_path,
+                    item.image_data_url,
+                    if item.is_pinned { 1 } else { 0 },
+                    item.source_device,
+                    item.updated_at,
+                    item.copy_count,
+                    if deleted { 1 } else { 0 },
+                    existing_id
+                ],
+            )
+            .map_err(|e| e.to_string())?;
+            return Ok(true);
+        }
+
+        if deleted {
+            return Ok(false);
         }
 
         conn.execute(
@@ -769,16 +804,7 @@ impl Database {
                 id, category, content, preview, content_hash, language,
                 image_path, image_data_url, byte_size, is_pinned,
                 source_device, created_at, updated_at, copy_count, deleted
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
-            ON CONFLICT(id) DO UPDATE SET
-                category = excluded.category,
-                content = excluded.content,
-                preview = excluded.preview,
-                language = excluded.language,
-                is_pinned = excluded.is_pinned,
-                updated_at = excluded.updated_at,
-                copy_count = excluded.copy_count,
-                deleted = excluded.deleted",
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 0)",
             params![
                 item.id,
                 item.category.as_str(),
@@ -794,7 +820,6 @@ impl Database {
                 item.created_at,
                 item.updated_at,
                 item.copy_count,
-                if deleted { 1 } else { 0 }
             ],
         )
         .map_err(|e| e.to_string())?;

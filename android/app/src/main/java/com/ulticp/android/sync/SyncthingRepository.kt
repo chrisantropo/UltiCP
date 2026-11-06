@@ -2,6 +2,7 @@ package com.ulticp.android.sync
 
 import android.content.Context
 import android.os.Build
+import android.os.Environment
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -42,6 +43,7 @@ data class SnippetModel(
 class SyncthingRepository(private val context: Context) {
 
     private val prefs = context.getSharedPreferences("ulticp_prefs", Context.MODE_PRIVATE)
+    private val localBackupFile = File(context.filesDir, "local_backup.jsonl")
 
     val deviceId: String
         get() = prefs.getString("device_id", null)
@@ -72,27 +74,49 @@ class SyncthingRepository(private val context: Context) {
         seedDefaultsIfNeeded()
     }
 
-    fun getSyncFolder(): File {
-        val customPath = prefs.getString("sync_folder", null)
-        return if (!customPath.isNullOrBlank()) {
-            File(customPath)
+    fun hasStoragePermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
         } else {
-            File(context.getExternalFilesDir(null), "syncthing_shared")
-        }.apply {
-            File(this, "devices").mkdirs()
-            File(this, "blobs").mkdirs()
+            true
         }
     }
 
+    fun getSyncFolder(): File {
+        val customPath = prefs.getString("sync_folder", null)
+        val defaultPublicDir = File(Environment.getExternalStorageDirectory(), "Documents/UltiCP")
+        val target = if (!customPath.isNullOrBlank() && !customPath.contains("/Android/data/")) {
+            File(customPath)
+        } else {
+            prefs.edit().putString("sync_folder", defaultPublicDir.absolutePath).apply()
+            defaultPublicDir
+        }
+        runCatching {
+            File(target, "devices").mkdirs()
+            File(target, "blobs").mkdirs()
+        }
+        return target
+    }
+
     fun setSyncFolderPath(path: String) {
+        val (clips, snippets) = loadMergedState()
         prefs.edit().putString("sync_folder", path.trim()).apply()
-        getSyncFolder()
+        saveAllState(clips, snippets)
+    }
+
+    fun syncAndExportNow() {
+        val (clips, snippets) = loadMergedState()
+        saveAllState(clips, snippets)
     }
 
     private fun seedDefaultsIfNeeded() {
-        val devicesDir = File(getSyncFolder(), "devices")
-        val myFile = File(devicesDir, "$deviceId.jsonl")
-        if (myFile.exists() && myFile.length() > 0L) return
+        if (localBackupFile.exists() && localBackupFile.length() > 0L) return
+
+        val (existingClips, existingSnippets) = loadMergedState()
+        if (existingClips.isNotEmpty() || existingSnippets.isNotEmpty()) {
+            saveAllState(existingClips, existingSnippets)
+            return
+        }
 
         val now = System.currentTimeMillis()
         val starterSnippets = listOf(
@@ -142,14 +166,6 @@ class SyncthingRepository(private val context: Context) {
             createClipModel(
                 "Bienvenido a UltiCP Android — Sincroniza tu portapapeles y snippets con Windows mediante Syncthing P2P y expande abreviaturas en cualquier app.",
                 pinned = true
-            ),
-            createClipModel(
-                "https://github.com/syncthing/syncthing?utm_source=newsletter&utm_medium=social&fbclid=IwAR12345",
-                pinned = false
-            ),
-            createClipModel(
-                "{\n  \"app\": \"UltiCP\",\n  \"platform\": \"Android\",\n  \"sync\": \"Syncthing JSONL\"\n}",
-                pinned = false
             )
         )
 
@@ -197,57 +213,86 @@ class SyncthingRepository(private val context: Context) {
         )
     }
 
+    private fun collectAllJsonlFiles(): List<File> {
+        val files = mutableListOf<File>()
+        if (localBackupFile.exists()) {
+            files.add(localBackupFile)
+        }
+        // Also check legacy internal externalFilesDir in case user had clips there earlier
+        val legacyDir = File(context.getExternalFilesDir(null), "syncthing_shared/devices")
+        legacyDir.listFiles { f -> f.extension == "jsonl" }?.let { files.addAll(it) }
+
+        // Check active Syncthing folder (/storage/emulated/0/Documents/UltiCP/devices)
+        val syncDevicesDir = File(getSyncFolder(), "devices")
+        syncDevicesDir.listFiles { f -> f.extension == "jsonl" }?.let { files.addAll(it) }
+
+        return files
+    }
+
+    fun getDetectedSyncFilesNames(): List<String> {
+        val syncDevicesDir = File(getSyncFolder(), "devices")
+        return syncDevicesDir.listFiles { f -> f.extension == "jsonl" }
+            ?.map { "${it.name} (${it.length() / 1024} KB)" }
+            ?: emptyList()
+    }
+
     fun loadMergedState(): Pair<MutableList<ClipItemModel>, MutableList<SnippetModel>> {
-        val devicesDir = File(getSyncFolder(), "devices")
         val clipsByHash = linkedMapOf<String, ClipItemModel>()
         val snippetsByTrigger = linkedMapOf<String, SnippetModel>()
 
-        devicesDir.listFiles { f -> f.extension == "jsonl" }?.forEach { file ->
-            file.forEachLine { line ->
-                val trimmed = line.trim()
-                if (trimmed.isEmpty()) return@forEachLine
-                runCatching {
-                    val obj = JSONObject(trimmed)
-                    val deleted = obj.optBoolean("deleted", false)
-                    when (obj.optString("record_type")) {
-                        "clip" -> {
-                            val item = obj.getJSONObject("item")
-                            val clip = ClipItemModel(
-                                id = item.getString("id"),
-                                category = item.optString("category", "plain_text"),
-                                content = item.getString("content"),
-                                preview = item.optString("preview", item.getString("content").take(180)),
-                                contentHash = item.getString("content_hash"),
-                                language = if (item.isNull("language")) null else item.optString("language"),
-                                byteSize = item.optInt("byte_size", 0),
-                                isPinned = item.optBoolean("is_pinned", false),
-                                sourceDevice = item.optString("source_device", "Dispositivo"),
-                                createdAt = item.optLong("created_at", 0L),
-                                updatedAt = item.optLong("updated_at", 0L),
-                                copyCount = item.optLong("copy_count", 1L),
-                                deleted = deleted
-                            )
-                            val existing = clipsByHash[clip.contentHash]
-                            if (existing == null || clip.updatedAt >= existing.updatedAt) {
-                                clipsByHash[clip.contentHash] = clip
-                            }
-                        }
-                        "snippet" -> {
-                            val s = obj.getJSONObject("snippet")
-                            val snippet = SnippetModel(
-                                id = s.getString("id"),
-                                trigger = s.getString("trigger"),
-                                title = s.getString("title"),
-                                body = s.getString("body"),
-                                category = s.optString("category", "General"),
-                                enabled = s.optBoolean("enabled", true),
-                                useCount = s.optLong("use_count", 0L),
-                                updatedAt = s.optLong("updated_at", 0L),
-                                deleted = deleted
-                            )
-                            val existing = snippetsByTrigger[snippet.trigger]
-                            if (existing == null || snippet.updatedAt >= existing.updatedAt) {
-                                snippetsByTrigger[snippet.trigger] = snippet
+        for (file in collectAllJsonlFiles()) {
+            runCatching {
+                file.useLines { lines ->
+                    lines.forEach { line ->
+                        val trimmed = line.trim()
+                        if (trimmed.isEmpty()) return@forEach
+                        runCatching {
+                            val obj = JSONObject(trimmed)
+                            val deleted = obj.optBoolean("deleted", false)
+                            when (obj.optString("record_type")) {
+                                "clip" -> {
+                                    val item = obj.getJSONObject("item")
+                                    val cat = item.optString("category", "plain_text")
+                                    // Skip raw image records on mobile text list or show compact label
+                                    val contentStr = item.getString("content")
+                                    val clip = ClipItemModel(
+                                        id = item.getString("id"),
+                                        category = cat,
+                                        content = contentStr,
+                                        preview = item.optString("preview", contentStr.take(180)),
+                                        contentHash = item.getString("content_hash"),
+                                        language = if (item.isNull("language")) null else item.optString("language"),
+                                        byteSize = item.optInt("byte_size", 0),
+                                        isPinned = item.optBoolean("is_pinned", false),
+                                        sourceDevice = item.optString("source_device", "Dispositivo"),
+                                        createdAt = item.optLong("created_at", 0L),
+                                        updatedAt = item.optLong("updated_at", 0L),
+                                        copyCount = item.optLong("copy_count", 1L),
+                                        deleted = deleted
+                                    )
+                                    val existing = clipsByHash[clip.contentHash]
+                                    if (existing == null || clip.updatedAt >= existing.updatedAt) {
+                                        clipsByHash[clip.contentHash] = clip
+                                    }
+                                }
+                                "snippet" -> {
+                                    val s = obj.getJSONObject("snippet")
+                                    val snippet = SnippetModel(
+                                        id = s.getString("id"),
+                                        trigger = s.getString("trigger"),
+                                        title = s.getString("title"),
+                                        body = s.getString("body"),
+                                        category = s.optString("category", "General"),
+                                        enabled = s.optBoolean("enabled", true),
+                                        useCount = s.optLong("use_count", 0L),
+                                        updatedAt = s.optLong("updated_at", 0L),
+                                        deleted = deleted
+                                    )
+                                    val existing = snippetsByTrigger[snippet.trigger]
+                                    if (existing == null || snippet.updatedAt >= existing.updatedAt) {
+                                        snippetsByTrigger[snippet.trigger] = snippet
+                                    }
+                                }
                             }
                         }
                     }
@@ -263,9 +308,6 @@ class SyncthingRepository(private val context: Context) {
     }
 
     private fun saveAllState(clips: List<ClipItemModel>, snippets: List<SnippetModel>) {
-        val devicesDir = File(getSyncFolder(), "devices")
-        devicesDir.mkdirs()
-        val myFile = File(devicesDir, "$deviceId.jsonl")
         val sb = StringBuilder()
 
         for (c in clips) {
@@ -312,7 +354,20 @@ class SyncthingRepository(private val context: Context) {
             sb.append(rec.toString()).append("\n")
         }
 
-        myFile.writeText(sb.toString())
+        val serialized = sb.toString()
+
+        // 1. Always save to internal backup
+        runCatching {
+            localBackupFile.writeText(serialized)
+        }
+
+        // 2. Also export to Syncthing shared folder (/storage/emulated/0/Documents/UltiCP/devices/<deviceId>.jsonl)
+        runCatching {
+            val devicesDir = File(getSyncFolder(), "devices")
+            devicesDir.mkdirs()
+            val myFile = File(devicesDir, "$deviceId.jsonl")
+            myFile.writeText(serialized)
+        }
     }
 
     fun recordCopiedText(text: String, pinned: Boolean = false): ClipItemModel {
@@ -328,6 +383,7 @@ class SyncthingRepository(private val context: Context) {
                 updatedAt = now,
                 copyCount = old.copyCount + 1,
                 isPinned = old.isPinned || pinned,
+                sourceDevice = deviceName,
                 deleted = false
             ).also { clips[idx] = it }
         } else {
@@ -424,7 +480,7 @@ class SyncthingRepository(private val context: Context) {
     fun toStateJson(): String {
         val (clips, snippets) = loadMergedState()
         val clipsArr = JSONArray()
-        clips.filter { !it.deleted }.forEach { c ->
+        clips.filter { !it.deleted && it.category != "image" }.forEach { c ->
             clipsArr.put(JSONObject().apply {
                 put("id", c.id)
                 put("category", c.category)
@@ -451,6 +507,9 @@ class SyncthingRepository(private val context: Context) {
             })
         }
 
+        val filesArr = JSONArray()
+        getDetectedSyncFilesNames().forEach { filesArr.put(it) }
+
         return JSONObject().apply {
             put("clips", clipsArr)
             put("snippets", snippetsArr)
@@ -459,6 +518,8 @@ class SyncthingRepository(private val context: Context) {
             put("sync_folder", getSyncFolder().absolutePath)
             put("auto_clean_urls", autoCleanUrls)
             put("snippet_expansion_enabled", snippetExpansionEnabled)
+            put("storage_permission_granted", hasStoragePermission())
+            put("detected_files", filesArr)
         }.toString()
     }
 

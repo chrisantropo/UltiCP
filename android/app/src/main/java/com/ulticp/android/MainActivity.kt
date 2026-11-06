@@ -5,9 +5,12 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowInsets
@@ -86,6 +89,7 @@ class MainActivity : Activity() {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
             captureSystemClipboardIfPresent()
+            repository.syncAndExportNow()
             webView.evaluateJavascript("window.refreshFromNative && window.refreshFromNative();", null)
         }
     }
@@ -125,7 +129,37 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun captureClipboardNow(): String {
             captureSystemClipboardIfPresent()
+            repository.syncAndExportNow()
+            runOnUiThread {
+                Toast.makeText(this@MainActivity, "Portapapeles capturado y sincronizado", Toast.LENGTH_SHORT).show()
+            }
             return repository.toStateJson()
+        }
+
+        @JavascriptInterface
+        fun syncNow(): String {
+            repository.syncAndExportNow()
+            runOnUiThread {
+                Toast.makeText(this@MainActivity, "Sincronizado con carpeta Syncthing", Toast.LENGTH_SHORT).show()
+            }
+            return repository.toStateJson()
+        }
+
+        @JavascriptInterface
+        fun requestAllFilesPermission() {
+            runOnUiThread {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    try {
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        )
+                        startActivity(intent)
+                    } catch (_: Exception) {
+                        startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                    }
+                }
+            }
         }
 
         @JavascriptInterface
@@ -135,6 +169,7 @@ class MainActivity : Activity() {
                 repository.recordCopiedText(trimmed, pinned)
                 runOnUiThread {
                     clipboardManager.setPrimaryClip(ClipData.newPlainText("UltiCP", trimmed))
+                    Toast.makeText(this@MainActivity, "Guardado y exportado a Syncthing", Toast.LENGTH_SHORT).show()
                 }
             }
             return repository.toStateJson()
@@ -239,6 +274,10 @@ class MainActivity : Activity() {
             if (syncFolder.isNotBlank()) repository.setSyncFolderPath(syncFolder.trim())
             repository.autoCleanUrls = autoCleanUrls
             repository.snippetExpansionEnabled = snippetExpansion
+            repository.syncAndExportNow()
+            runOnUiThread {
+                Toast.makeText(this@MainActivity, "Sincronizado correctamente", Toast.LENGTH_SHORT).show()
+            }
             return repository.toStateJson()
         }
     }
