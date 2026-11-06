@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>UltiCP Android</title>
   <style>
     :root {
@@ -12,40 +12,72 @@
       --border: rgba(148, 163, 184, 0.16);
       --text: #f8fafc;
       --muted: #94a3b8;
-      --primary: #6366f1;
+      --primary: #5f66ee;
       --emerald: #10b981;
       --amber: #f59e0b;
       --rose: #f43f5e;
       --cyan: #06b6d4;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body {
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
-      padding-bottom: 76px;
+      display: flex;
+      flex-direction: column;
     }
     header {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      background: rgba(17, 24, 39, 0.94);
-      backdrop-filter: blur(10px);
+      flex-shrink: 0;
+      background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 14px 16px;
+      padding: 12px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
     }
-    .brand { display: flex; align-items: center; gap: 10px; }
-    .logo {
-      width: 34px; height: 34px; border-radius: 9px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 16px;
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .logo-box {
+      width: 38px;
+      height: 38px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      background: #080c14;
+      border: 1px solid rgba(95, 102, 238, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px;
     }
-    .brand h1 { font-size: 1.05rem; }
-    .brand small { font-size: 0.72rem; color: var(--muted); display: block; }
+    .logo-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .brand-text { min-width: 0; }
+    .brand h1 { font-size: 1.05rem; line-height: 1.2; }
+    .brand small {
+      font-size: 0.72rem;
+      color: var(--muted);
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hdr-btn {
+      flex-shrink: 0;
+      white-space: nowrap;
+      padding: 8px 12px;
+      font-size: 0.78rem;
+    }
+    main.scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
     .container { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
     .search-row { display: flex; gap: 8px; }
     input[type="text"], textarea {
@@ -68,7 +100,7 @@
     .badge {
       padding: 2px 7px; border-radius: 5px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
     }
-    .b-code { background: rgba(99,102,241,0.22); color: #a5b4fc; }
+    .b-code { background: rgba(95,102,238,0.22); color: #a5b4fc; }
     .b-url { background: rgba(6,182,212,0.22); color: #67e8f9; }
     .b-text { background: rgba(148,163,184,0.18); color: #cbd5e1; }
     .preview {
@@ -86,16 +118,19 @@
     .btn-danger { background: rgba(244, 63, 94, 0.16); color: #fb7185; }
     .btn-amber { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
     .bottom-nav {
-      position: fixed; bottom: 0; left: 0; right: 0; height: 64px;
-      background: var(--surface); border-top: 1px solid var(--border);
-      display: grid; grid-template-columns: repeat(4, 1fr); z-index: 30;
+      flex-shrink: 0;
+      height: 60px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
     }
     .nav-btn {
       background: transparent; border-radius: 0; display: flex;
       flex-direction: column; align-items: center; justify-content: center;
-      gap: 3px; font-size: 0.7rem; color: var(--muted);
+      gap: 3px; font-size: 0.72rem; color: var(--muted); padding: 6px 4px;
     }
-    .nav-btn.active { color: #a5b4fc; background: rgba(99,102,241,0.1); }
+    .nav-btn.active { color: #a5b4fc; background: rgba(95,102,238,0.12); }
     .check-row { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; }
     label.field { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; color: var(--muted); }
   </style>
@@ -103,106 +138,110 @@
 <body>
   <header>
     <div class="brand">
-      <div class="logo">U</div>
-      <div>
+      <div class="logo-box">
+        <img src="UltiCP.svg" alt="UltiCP" />
+      </div>
+      <div class="brand-text">
         <h1>UltiCP</h1>
         <small id="hdr-device">Local-First · Syncthing P2P</small>
       </div>
     </div>
-    <button class="btn-primary" onclick="captureNow()">+ Capturar Portapapeles</button>
+    <button class="btn-primary hdr-btn" onclick="captureNow()">+ Capturar</button>
   </header>
 
-  <!-- TAB 1: HISTORY -->
-  <div id="tab-history" class="container">
-    <div class="search-row">
-      <input type="text" id="search-input" placeholder="Buscar texto, código, URL..." oninput="renderClips()" />
-    </div>
-    <div class="pills">
-      <button class="pill active" onclick="setCat('all', this)">Todos</button>
-      <button class="pill" onclick="setCat('plain_text', this)">Texto</button>
-      <button class="pill" onclick="setCat('code', this)">Código</button>
-      <button class="pill" onclick="setCat('url', this)">URLs</button>
-      <button class="pill" onclick="setCat('pinned', this)">★ Fijados</button>
+  <main class="scroll-area">
+    <!-- TAB 1: HISTORY -->
+    <div id="tab-history" class="container">
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="Buscar texto, código, URL..." oninput="renderClips()" />
+      </div>
+      <div class="pills">
+        <button class="pill active" onclick="setCat('all', this)">Todos</button>
+        <button class="pill" onclick="setCat('plain_text', this)">Texto</button>
+        <button class="pill" onclick="setCat('code', this)">Código</button>
+        <button class="pill" onclick="setCat('url', this)">URLs</button>
+        <button class="pill" onclick="setCat('pinned', this)">★ Fijados</button>
+      </div>
+
+      <div class="card">
+        <textarea id="new-clip-txt" rows="2" placeholder="Añadir nuevo clip o nota rápida..."></textarea>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="addNewClip()">Guardar y Copiar</button>
+        </div>
+      </div>
+
+      <div id="clips-list" style="display:flex;flex-direction:column;gap:10px;"></div>
     </div>
 
-    <div class="card">
-      <textarea id="new-clip-txt" rows="2" placeholder="Añadir nuevo clip o nota rápida..."></textarea>
-      <div class="btn-row">
-        <button class="btn-primary" onclick="addNewClip()">Guardar y Copiar</button>
+    <!-- TAB 2: SNIPPETS -->
+    <div id="tab-snippets" class="container" style="display:none;">
+      <div class="card">
+        <strong>Expansión Rápida en Cualquier App de Android</strong>
+        <p style="font-size:0.78rem;color:var(--muted);">
+          Escribe un atajo como <code>;firma</code> o <code>;fecha</code> en WhatsApp, Gmail o Notas, selecciónalo y toca <strong>«UltiCP ⚡ Expandir / Limpiar»</strong> en el menú emergente de Android para reemplazarlo al instante (o pulsa <em>Expandir y Copiar</em> aquí abajo).
+        </p>
+      </div>
+
+      <div class="card">
+        <strong>Nuevo / Editar Snippet</strong>
+        <input type="text" id="snip-trigger" placeholder="Abreviatura (ej. ;firma)" value=";" />
+        <input type="text" id="snip-title" placeholder="Título descriptivo" />
+        <input type="text" id="snip-cat" placeholder="Categoría (Trabajo, Móvil...)" value="General" />
+        <div class="btn-row">
+          <button onclick="insertVar('{{date}}')">{{date}}</button>
+          <button onclick="insertVar('{{time}}')">{{time}}</button>
+          <button onclick="insertVar('{{clipboard}}')">{{clipboard}}</button>
+          <button onclick="insertVar('{{uuid}}')">{{uuid}}</button>
+        </div>
+        <textarea id="snip-body" rows="3" placeholder="Plantilla a expandir..."></textarea>
+        <button class="btn-primary" onclick="saveSnippet()">Guardar Snippet</button>
+      </div>
+
+      <div id="snippets-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+    <!-- TAB 3: CLEANER -->
+    <div id="tab-cleaner" class="container" style="display:none;">
+      <div class="card">
+        <strong>Limpiador de Formato (URLs, JSON, Markdown)</strong>
+        <label class="check-row"><input type="checkbox" id="c-url" checked onchange="runCleaner(false)" /> Eliminar tracking URLs (utm_*, fbclid, gclid, si)</label>
+        <label class="check-row"><input type="checkbox" id="c-json" checked onchange="runCleaner(false)" /> Formatear JSON minificado a legible</label>
+        <label class="check-row"><input type="checkbox" id="c-md" checked onchange="runCleaner(false)" /> Normalizar Markdown</label>
+        <textarea id="clean-in" rows="5" oninput="runCleaner(false)">{"app":"UltiCP","link":"https://ejemplo.com/item?id=7&utm_source=twitter&fbclid=IwAR99"}</textarea>
+        <div id="clean-badges" class="btn-row"></div>
+        <div class="preview" id="clean-out"></div>
+        <button class="btn-primary" onclick="runCleaner(true)">Copiar Resultado Limpio</button>
       </div>
     </div>
 
-    <div id="clips-list" style="display:flex;flex-direction:column;gap:10px;"></div>
-  </div>
-
-  <!-- TAB 2: SNIPPETS -->
-  <div id="tab-snippets" class="container" style="display:none;">
-    <div class="card">
-      <strong>Expansión Rápida en Cualquier App de Android</strong>
-      <p style="font-size:0.78rem;color:var(--muted);">
-        Escribe un atajo como <code>;firma</code> o <code>;fecha</code> en WhatsApp, Gmail o Notas, selecciónalo y toca <strong>«UltiCP ⚡ Expandir / Limpiar»</strong> en el menú emergente de Android para reemplazarlo al instante (o pulsa <em>Expandir y Copiar</em> aquí abajo).
-      </p>
-    </div>
-
-    <div class="card">
-      <strong>Nuevo / Editar Snippet</strong>
-      <input type="text" id="snip-trigger" placeholder="Abreviatura (ej. ;firma)" value=";" />
-      <input type="text" id="snip-title" placeholder="Título descriptivo" />
-      <input type="text" id="snip-cat" placeholder="Categoría (Trabajo, Móvil...)" value="General" />
-      <div class="btn-row">
-        <button onclick="insertVar('{{date}}')">{{date}}</button>
-        <button onclick="insertVar('{{time}}')">{{time}}</button>
-        <button onclick="insertVar('{{clipboard}}')">{{clipboard}}</button>
-        <button onclick="insertVar('{{uuid}}')">{{uuid}}</button>
-      </div>
-      <textarea id="snip-body" rows="3" placeholder="Plantilla a expandir..."></textarea>
-      <button class="btn-primary" onclick="saveSnippet()">Guardar Snippet</button>
-    </div>
-
-    <div id="snippets-list" style="display:flex;flex-direction:column;gap:10px;"></div>
-  </div>
-
-  <!-- TAB 3: CLEANER -->
-  <div id="tab-cleaner" class="container" style="display:none;">
-    <div class="card">
-      <strong>Limpiador de Formato (URLs, JSON, Markdown)</strong>
-      <label class="check-row"><input type="checkbox" id="c-url" checked onchange="runCleaner(false)" /> Eliminar tracking URLs (utm_*, fbclid, gclid, si)</label>
-      <label class="check-row"><input type="checkbox" id="c-json" checked onchange="runCleaner(false)" /> Formatear JSON minificado a legible</label>
-      <label class="check-row"><input type="checkbox" id="c-md" checked onchange="runCleaner(false)" /> Normalizar Markdown</label>
-      <textarea id="clean-in" rows="5" oninput="runCleaner(false)">{"app":"UltiCP","link":"https://ejemplo.com/item?id=7&utm_source=twitter&fbclid=IwAR99"}</textarea>
-      <div id="clean-badges" class="btn-row"></div>
-      <div class="preview" id="clean-out"></div>
-      <button class="btn-primary" onclick="runCleaner(true)">Copiar Resultado Limpio</button>
-    </div>
-  </div>
-
-  <!-- TAB 4: SYNCTHING -->
-  <div id="tab-sync" class="container" style="display:none;">
-    <div class="card">
-      <strong>Sincronización P2P Syncthing (Windows ↔ Android)</strong>
-      <p style="font-size:0.78rem;color:var(--muted);">
-        Comparte esta carpeta en la app Syncthing de Android con tu PC Windows. Cada dispositivo escribe en su propio archivo <code>devices/&lt;id&gt;.jsonl</code> sin corromper SQLite.
-      </p>
-      <label class="field">Nombre del dispositivo
-        <input type="text" id="cfg-name" />
-      </label>
-      <label class="field">ID único (JSONL)
-        <input type="text" id="cfg-id" disabled />
-      </label>
-      <label class="field">Ruta de carpeta Syncthing en Android
-        <input type="text" id="cfg-folder" />
-      </label>
-      <label class="check-row">
-        <input type="checkbox" id="cfg-autoclean" /> Limpiar URLs de tracking automáticamente al copiar
-      </label>
-      <label class="check-row">
-        <input type="checkbox" id="cfg-autoexpand" /> Expandir snippets automáticamente al escribir
-      </label>
-      <div class="btn-row">
-        <button class="btn-primary" onclick="saveSettings()">Guardar y Sincronizar Ahora</button>
+    <!-- TAB 4: SYNCTHING -->
+    <div id="tab-sync" class="container" style="display:none;">
+      <div class="card">
+        <strong>Sincronización P2P Syncthing (Windows ↔ Android)</strong>
+        <p style="font-size:0.78rem;color:var(--muted);">
+          Comparte esta carpeta en la app Syncthing de Android con tu PC Windows. Cada dispositivo escribe en su propio archivo <code>devices/&lt;id&gt;.jsonl</code> sin corromper SQLite.
+        </p>
+        <label class="field">Nombre del dispositivo
+          <input type="text" id="cfg-name" />
+        </label>
+        <label class="field">ID único (JSONL)
+          <input type="text" id="cfg-id" disabled />
+        </label>
+        <label class="field">Ruta de carpeta Syncthing en Android
+          <input type="text" id="cfg-folder" />
+        </label>
+        <label class="check-row">
+          <input type="checkbox" id="cfg-autoclean" /> Limpiar URLs de tracking automáticamente al copiar
+        </label>
+        <label class="check-row">
+          <input type="checkbox" id="cfg-autoexpand" /> Expandir snippets automáticamente al escribir
+        </label>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="saveSettings()">Guardar y Sincronizar Ahora</button>
+        </div>
       </div>
     </div>
-  </div>
+  </main>
 
   <nav class="bottom-nav">
     <button class="nav-btn active" onclick="switchTab('history', this)">📋<span>Portapapeles</span></button>
@@ -393,4 +432,3 @@
   </script>
 </body>
 </html>
-

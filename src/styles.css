@@ -62,15 +62,22 @@ textarea {
 }
 
 .brand-logo {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: #080c14;
+  border: 1px solid rgba(95, 102, 238, 0.38);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  padding: 5px;
+  box-shadow: 0 4px 14px rgba(95, 102, 238, 0.25);
+}
+
+.brand-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .brand h1 {

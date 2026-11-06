@@ -6,12 +6,16 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
+import android.view.ViewGroup
 import android.view.Window
+import android.view.WindowInsets
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.Toast
 import com.ulticp.android.cleaner.FormatCleaner
 import com.ulticp.android.sync.SyncthingRepository
@@ -28,11 +32,33 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
-        window.statusBarColor = Color.parseColor("#0B0F19")
-        window.navigationBarColor = Color.parseColor("#111827")
 
         repository = SyncthingRepository(applicationContext)
         clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+        val rootContainer = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#0B0F19"))
+            fitsSystemWindows = false
+            setOnApplyWindowInsetsListener { view, insets ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val bars = insets.getInsets(
+                        WindowInsets.Type.systemBars() or
+                                WindowInsets.Type.displayCutout() or
+                                WindowInsets.Type.ime()
+                    )
+                    view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                } else {
+                    @Suppress("DEPRECATION")
+                    view.setPadding(
+                        insets.systemWindowInsetLeft,
+                        insets.systemWindowInsetTop,
+                        insets.systemWindowInsetRight,
+                        insets.systemWindowInsetBottom
+                    )
+                }
+                insets
+            }
+        }
 
         webView = WebView(this).apply {
             setBackgroundColor(Color.parseColor("#0B0F19"))
@@ -44,13 +70,21 @@ class MainActivity : Activity() {
             loadUrl("file:///android_asset/index.html")
         }
 
-        setContentView(webView)
+        rootContainer.addView(
+            webView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        setContentView(rootContainer)
+        rootContainer.requestApplyInsets()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
-            // Android 10+ permits reading clipboard when window gains focus
             captureSystemClipboardIfPresent()
             webView.evaluateJavascript("window.refreshFromNative && window.refreshFromNative();", null)
         }
@@ -209,4 +243,3 @@ class MainActivity : Activity() {
         }
     }
 }
-

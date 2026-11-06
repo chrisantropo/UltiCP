@@ -492,7 +492,7 @@ export function App() {
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-logo">
-            <Clipboard size={20} />
+            <img src="/UltiCP.svg" alt="UltiCP" className="brand-logo-img" />
           </div>
           <div>
             <h1>UltiCP</h1>
