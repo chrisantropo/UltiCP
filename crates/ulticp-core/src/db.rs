@@ -494,7 +494,11 @@ impl Database {
         Ok(next != 0)
     }
 
-    pub fn update_item_content(&self, id: &str, new_content: &str) -> Result<ClipboardItem, String> {
+    pub fn update_item_content(
+        &self,
+        id: &str,
+        new_content: &str,
+    ) -> Result<ClipboardItem, String> {
         let trimmed = new_content.trim();
         let (category, language) = classify_text(trimmed);
         let preview = build_preview(trimmed, 180);
@@ -871,4 +875,3 @@ impl Database {
         Ok(true)
     }
 }
-
