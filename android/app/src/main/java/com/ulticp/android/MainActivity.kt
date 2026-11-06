@@ -5,10 +5,8 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.provider.Settings
 import android.view.Window
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -208,13 +206,6 @@ class MainActivity : Activity() {
             repository.autoCleanUrls = autoCleanUrls
             repository.snippetExpansionEnabled = snippetExpansion
             return repository.toStateJson()
-        }
-
-        @JavascriptInterface
-        fun openAccessibilitySettings() {
-            runOnUiThread {
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }
         }
     }
 }
